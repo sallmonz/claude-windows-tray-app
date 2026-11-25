@@ -99,6 +99,21 @@ public sealed class UsageClientTests : IDisposable
         Assert.Equal(FetchStatus.NetworkError, (await client.FetchAsync()).Status);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void CredentialsPath_DefaultsToUserProfile(string? configDir)
+    {
+        Assert.Equal(Path.Combine("home", ".claude", ".credentials.json"),
+            UsageClient.CredentialsPathFor(configDir, "home"));
+    }
+
+    [Fact]
+    public void CredentialsPath_UsesClaudeConfigDir()
+    {
+        Assert.Equal(Path.Combine("custom", ".credentials.json"), UsageClient.CredentialsPathFor("custom", "home"));
+    }
+
     private sealed class FakeHandler(Func<HttpResponseMessage> respond) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }

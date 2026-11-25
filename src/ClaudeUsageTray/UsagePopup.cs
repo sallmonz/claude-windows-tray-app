@@ -543,7 +543,7 @@ internal sealed partial class UsagePopup : Form
                 : new Font(bold ? "Segoe UI Semibold" : ui, px, FontStyle.Regular, GraphicsUnit.Pixel);
             Font Px(string family, float px) => new(family, px, FontStyle.Regular, GraphicsUnit.Pixel);
 
-            Title = Ui(13, bold: true);
+            Title = Px("Segoe UI Semibold", 13); // "Claude Usage" is Latin text: same font in both languages
             Label = Ui(12);
             Strong = Ui(14, bold: true);
             Small = Ui(12);

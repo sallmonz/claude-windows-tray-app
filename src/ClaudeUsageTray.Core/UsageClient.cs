@@ -32,8 +32,17 @@ public sealed class UsageClient
         _log = log ?? (_ => { });
     }
 
-    public static string DefaultCredentialsPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", ".credentials.json");
+    /// <summary>
+    /// %CLAUDE_CONFIG_DIR%\.credentials.json when Claude Code is configured to use another folder,
+    /// otherwise %USERPROFILE%\.claude\.credentials.json.
+    /// </summary>
+    public static string DefaultCredentialsPath => CredentialsPathFor(
+        Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"),
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+
+    internal static string CredentialsPathFor(string? configDir, string userProfile) =>
+        Path.Combine(string.IsNullOrWhiteSpace(configDir) ? Path.Combine(userProfile, ".claude") : configDir,
+            ".credentials.json");
 
     private static HttpClient CreateHttpClient()
     {

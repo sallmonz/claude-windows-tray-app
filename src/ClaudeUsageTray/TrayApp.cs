@@ -70,14 +70,33 @@ internal sealed class TrayApp : ApplicationContext
         _popup.Hide();
         var s = S;
         bool startup = StartupRegistry.IsEnabled();
+        bool weekly = _settings.IconSource == IconSource.Weekly;
         var menu = new TrayMenu(
         [
             new(s.MenuRefresh, "\uE72C", () => _ = RefreshAsync(), Enabled: !_refreshing),
-            new(s.MenuStartWithWindows, startup ? "\uE73E" : "", () => StartupRegistry.SetEnabled(!startup)),
             null,
+            new(s.MenuIconFiveHour, "\uE823", () => SetIconSource(IconSource.FiveHour), Selected: !weekly),
+            new(s.MenuIconWeekly, "\uE787", () => SetIconSource(IconSource.Weekly), Selected: weekly),
+            new(s.MenuIconPercent, "%", ToggleIconPercent, Toggle: _settings.IconShowPercent),
+            null,
+            new(s.MenuStartWithWindows, "\uE768", () => StartupRegistry.SetEnabled(!startup), Toggle: startup),
             new(s.MenuExit, "\uE7E8", ExitThread),
         ], CurrentTheme, _settings.Language);
         menu.ShowAt(Cursor.Position);
+    }
+
+    private void SetIconSource(IconSource source)
+    {
+        _settings.IconSource = source;
+        _settings.Save();
+        UpdateUi();
+    }
+
+    private void ToggleIconPercent()
+    {
+        _settings.IconShowPercent = !_settings.IconShowPercent;
+        _settings.Save();
+        UpdateUi();
     }
 
     private async Task RefreshAsync()
@@ -118,7 +137,8 @@ internal sealed class TrayApp : ApplicationContext
             var s = S;
             var snap = _state.Snapshot;
             bool stale = snap is null || _state.IsStale;
-            var newIcon = IconRenderer.Render(snap?.Data.FiveHour?.Utilization, stale);
+            var window = _settings.IconSource == IconSource.Weekly ? snap?.Data.SevenDay : snap?.Data.FiveHour;
+            var newIcon = IconRenderer.Render(window?.Utilization, stale, _settings.IconShowPercent);
             _tray.Icon = newIcon;
             _icon?.Dispose();
             _icon = newIcon;

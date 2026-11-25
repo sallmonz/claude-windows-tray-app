@@ -23,6 +23,9 @@ public sealed class Strings
     public string MenuRefresh => Th ? "รีเฟรชตอนนี้" : "Refresh now";
     public string MenuStartWithWindows => Th ? "เริ่มพร้อม Windows" : "Start with Windows";
     public string MenuExit => Th ? "ออก" : "Exit";
+    public string MenuIconFiveHour => Th ? "ไอคอนแสดงรอบ 5 ชม." : "Icon shows 5-hour";
+    public string MenuIconWeekly => Th ? "ไอคอนแสดงรายสัปดาห์" : "Icon shows weekly";
+    public string MenuIconPercent => Th ? "แสดง % บนไอคอน" : "Show % on icon";
 
     public string ResetsIn(string duration) => Th ? $"รีเซ็ตใน {duration}" : $"Resets in {duration}";
     public string At(string time) => Th ? $"เวลา {time}" : $"at {time}";

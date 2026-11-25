@@ -26,7 +26,7 @@ internal static class Palette
 /// <summary>Draws the 5-hour percent onto a small tray icon with GDI+.</summary>
 internal static partial class IconRenderer
 {
-    public static Icon Render(double? percent, bool stale)
+    public static Icon Render(double? percent, bool stale, bool showPercent)
     {
         int size = SystemInformation.SmallIconSize.Width; // 16 at 100% scale
         int? rounded = percent is { } p ? (int)Math.Round(p, MidpointRounding.AwayFromZero) : null;
@@ -36,6 +36,7 @@ internal static partial class IconRenderer
             >= 100 => "!!",
             _ => rounded.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
+        bool withPercent = showPercent && rounded is >= 0 and < 100;
 
         using var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bmp))
@@ -49,8 +50,19 @@ internal static partial class IconRenderer
 
             using var family = new FontFamily("Segoe UI");
             using var path = new GraphicsPath();
-            float em = size * (text.Length >= 2 ? 0.78f : 0.9f);
-            path.AddString(text, family, (int)FontStyle.Bold, em, PointF.Empty, StringFormat.GenericTypographic);
+            float em = size * (text.Length >= 2 || withPercent ? 0.78f : 0.9f);
+            const int bold = (int)FontStyle.Bold;
+            path.AddString(text, family, bold, em, PointF.Empty, StringFormat.GenericTypographic);
+
+            if (withPercent)
+            {
+                // Smaller "%" on the same baseline, right after the digits.
+                float pctEm = em * 0.55f;
+                float ascent(float e) => e * family.GetCellAscent(FontStyle.Bold) / family.GetEmHeight(FontStyle.Bold);
+                var digits = path.GetBounds();
+                path.AddString("%", family, bold, pctEm,
+                    new PointF(digits.Right + em * 0.04f, ascent(em) - ascent(pctEm)), StringFormat.GenericTypographic);
+            }
 
             // Fit inside the icon with a 1px margin, then center by the real glyph bounds.
             var b = path.GetBounds();

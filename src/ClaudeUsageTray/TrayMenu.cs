@@ -11,16 +11,21 @@ namespace ClaudeUsageTray;
 /// </summary>
 internal sealed class TrayMenu : Form
 {
-    /// <summary>One menu row. Use null in the item list for a separator.</summary>
-    public sealed record Item(string Text, string Glyph, Action OnClick, bool Enabled = true);
+    /// <summary>
+    /// One menu row. Use null in the item list for a separator.
+    /// Toggle draws an on/off switch on the right; Selected draws a check mark on the right.
+    /// </summary>
+    public sealed record Item(string Text, string Glyph, Action OnClick, bool Enabled = true,
+        bool? Toggle = null, bool Selected = false);
 
     private const float RowHeight = 36, SeparatorHeight = 9, VPad = 4, HInset = 4;
-    private const float IconX = 16, TextX = 46, MinWidth = 200;
+    private const float IconX = 16, TextX = 46, MinWidth = 200, RightColumn = 56;
 
     private readonly IReadOnlyList<Item?> _items;
     private readonly Theme _theme;
     private readonly Font _font;
     private readonly Font _icon;
+    private readonly Font _textIcon;
     private readonly float _width;
     private readonly float _height;
     private int _hover = -1;
@@ -32,6 +37,7 @@ internal sealed class TrayMenu : Form
         _theme = theme;
         _font = new Font(Theme.UiFont(language), 14, FontStyle.Regular, GraphicsUnit.Pixel);
         _icon = new Font(Theme.IconFont, 16, FontStyle.Regular, GraphicsUnit.Pixel);
+        _textIcon = new Font("Segoe UI Semibold", 15, FontStyle.Regular, GraphicsUnit.Pixel);
 
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
@@ -46,7 +52,8 @@ internal sealed class TrayMenu : Form
         using (var g = CreateGraphics())
         {
             float textW = items.OfType<Item>().Select(i => g.MeasureString(i.Text, _font).Width).DefaultIfEmpty(0).Max();
-            _width = Math.Max(MinWidth, TextX + textW + 32);
+            bool hasRight = items.OfType<Item>().Any(i => i.Toggle is not null || i.Selected);
+            _width = Math.Max(MinWidth, TextX + textW + (hasRight ? RightColumn + 16 : 32));
         }
         _height = VPad * 2 + items.Sum(i => i is null ? SeparatorHeight : RowHeight);
     }
@@ -229,13 +236,64 @@ internal sealed class TrayMenu : Form
             var color = item.Enabled ? _theme.Text : _theme.SubText;
             using var brush = new SolidBrush(color);
             if (item.Glyph.Length > 0)
-                g.DrawString(item.Glyph, _icon, brush, new RectangleF(IconX - 4, row.Top, 24, row.Height), center);
+            {
+                // Private-use code points are icon-font glyphs; anything else (like "%") uses a text font.
+                var iconFont = item.Glyph[0] >= '\uE000' ? _icon : _textIcon;
+                g.DrawString(item.Glyph, iconFont, brush, new RectangleF(IconX - 4, row.Top, 24, row.Height), center);
+            }
             g.DrawString(item.Text, _font, brush, new RectangleF(TextX, row.Top, _width - TextX - 12, row.Height), vcenter);
+
+            if (item.Toggle is { } on)
+                DrawSwitch(g, new RectangleF(_width - 16 - 40, row.Top + (row.Height - 20) / 2, 40, 20), on);
+            else if (item.Selected)
+                g.DrawString("\uE73E", _icon, brush, new RectangleF(_width - 16 - 24, row.Top, 24, row.Height), center);
         }
 
         g.ResetTransform();
         using var border = new Pen(_theme.MenuBorder, 1);
         g.DrawRectangle(border, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
+    }
+
+    /// <summary>Windows 11 style toggle switch.</summary>
+    private void DrawSwitch(Graphics g, RectangleF r, bool on)
+    {
+        using var pill = IconRenderer.RoundedRect(r, r.Height / 2);
+        float knob = on ? 12 : 10;
+        float kx = on ? r.Right - 4 - knob : r.Left + 5;
+        var knobRect = new RectangleF(kx, r.Top + (r.Height - knob) / 2, knob, knob);
+        if (on)
+        {
+            using var fill = new SolidBrush(AccentColor());
+            g.FillPath(fill, pill);
+            using var k = new SolidBrush(_theme.IsDark ? Color.Black : Color.White);
+            g.FillEllipse(k, knobRect);
+        }
+        else
+        {
+            using var outline = new Pen(_theme.SubText, 1);
+            g.DrawPath(outline, pill);
+            using var k = new SolidBrush(_theme.SubText);
+            g.FillEllipse(k, knobRect);
+        }
+    }
+
+    /// <summary>The Windows accent color (DWM AccentColor is stored as ABGR), or Windows blue.</summary>
+    private Color AccentColor()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM");
+            if (key?.GetValue("AccentColor") is int abgr)
+            {
+                var c = Color.FromArgb(abgr & 0xFF, (abgr >> 8) & 0xFF, (abgr >> 16) & 0xFF);
+                return _theme.IsDark ? ControlPaint.Light(c, 0.6f) : c;
+            }
+        }
+        catch
+        {
+            // fall through
+        }
+        return _theme.IsDark ? Color.FromArgb(0x4C, 0xC2, 0xFF) : Color.FromArgb(0x00, 0x67, 0xC0);
     }
 
     protected override void Dispose(bool disposing)
@@ -244,6 +302,7 @@ internal sealed class TrayMenu : Form
         {
             _font.Dispose();
             _icon.Dispose();
+            _textIcon.Dispose();
         }
         base.Dispose(disposing);
     }

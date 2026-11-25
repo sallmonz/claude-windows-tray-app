@@ -6,6 +6,12 @@ using Microsoft.Win32;
 
 namespace ClaudeUsageTray;
 
+internal enum IconSource
+{
+    FiveHour,
+    Weekly,
+}
+
 /// <summary>User settings saved in %LOCALAPPDATA%\ClaudeUsageTray\settings.json.</summary>
 internal sealed class AppSettings
 {
@@ -16,6 +22,12 @@ internal sealed class AppSettings
     };
 
     private static string FilePath => Path.Combine(Logger.Directory, "settings.json");
+
+    /// <summary>Which window's percent is drawn on the tray icon.</summary>
+    public IconSource IconSource { get; set; } = IconSource.FiveHour;
+
+    /// <summary>Draw a small "%" after the number on the tray icon.</summary>
+    public bool IconShowPercent { get; set; }
 
     /// <summary>System until the user picks light or dark in the popup.</summary>
     public ThemeMode Theme { get; set; } = ThemeMode.System;

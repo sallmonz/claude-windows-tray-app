@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Keep the shared publish profile
+!src/ClaudeUsageTray/Properties/PublishProfiles/win-x64.pubxml

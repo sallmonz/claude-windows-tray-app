@@ -64,12 +64,20 @@ internal static partial class IconRenderer
                     new PointF(digits.Right + em * 0.04f, ascent(em) - ascent(pctEm)), StringFormat.GenericTypographic);
             }
 
-            // Fit inside the icon with a 1px margin, then center by the real glyph bounds.
+            // Fit inside the icon and center by the real glyph bounds. Tray icons are always square,
+            // so wide text ("30%") is squeezed horizontally (like a condensed font) instead of
+            // shrinking the whole thing; the digits keep their height. The squeeze is capped so
+            // the text never looks distorted.
             var b = path.GetBounds();
-            float scale = Math.Min(1f, Math.Min((size - 2) / b.Width, (size - 2) / b.Height));
+            float maxW = size - 1f, maxH = size - 2f;
+            float scaleY = Math.Min(1f, maxH / b.Height);
+            float scaleX = Math.Min(scaleY, maxW / b.Width);
+            const float MaxSqueeze = 0.7f; // width may shrink to 70% of the height scale
+            if (scaleX < scaleY * MaxSqueeze)
+                scaleY = scaleX / MaxSqueeze;
             using var m = new Matrix();
             m.Translate(size / 2f, size / 2f);
-            m.Scale(scale, scale);
+            m.Scale(scaleX, scaleY);
             m.Translate(-(b.Left + b.Width / 2f), -(b.Top + b.Height / 2f));
             path.Transform(m);
             g.FillPath(Brushes.White, path);

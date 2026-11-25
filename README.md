@@ -15,8 +15,12 @@ The popup follows the Windows light/dark theme and can switch between English an
 - Windows 10 or 11
 - [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (to run)
 - .NET 10 SDK (to build)
-- Claude Code, logged in with a Claude account. The app reads the token from
-  `%USERPROFILE%\.claude\.credentials.json`.
+- **Claude Code CLI**, logged in with a Claude account (`claude`, then `/login`). The app reads the token from
+  `%USERPROFILE%\.claude\.credentials.json` (or `%CLAUDE_CONFIG_DIR%\.credentials.json`).
+
+> **Using Claude Code only inside the Claude desktop app?** The desktop app keeps its own login and does not
+> write a usable token to `.credentials.json` (the file has an empty `accessToken`). Install the CLI and log in
+> once, then the tray app can read the token.
 
 ## Build and test
 
@@ -46,7 +50,8 @@ Output: `src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe`
 - **Unofficial API.** The app calls `https://api.anthropic.com/api/oauth/usage`, which is not a public
   or documented API. It can change or stop working at any time. If the format changes, the popup says so.
   All API knowledge is in `UsageClient.cs` and `UsageParser.cs`, so a fix only touches those files.
-- The app never refreshes the token itself. If the token expires, open Claude Code and it will refresh it.
+- The app never refreshes the token itself, so it cannot log out your Claude Code session. The CLI refreshes the
+  token when it runs. If the popup says the token expired, run `claude` in a terminal once.
 - Data refreshes every 3 minutes.
 
 ## Files

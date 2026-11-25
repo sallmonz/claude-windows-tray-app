@@ -41,10 +41,12 @@ public sealed class Strings
 
     public string Error(FetchStatus status, int? httpStatusCode) => status switch
     {
-        FetchStatus.NoCredentials => Th ? "ไม่พบการล็อกอิน Claude Code" : "Claude Code login not found",
+        FetchStatus.NoCredentials => Th
+            ? "ไม่พบการล็อกอิน Claude Code CLI\nเปิด terminal พิมพ์ claude แล้ว /login"
+            : "Claude Code CLI login not found.\nOpen a terminal, run claude, then /login",
         FetchStatus.TokenExpired => Th
-            ? "Token หมดอายุ กรุณาเปิด Claude Code เพื่อ refresh"
-            : "Token expired. Open Claude Code to refresh it",
+            ? "Token หมดอายุ\nเปิด terminal พิมพ์ claude เพื่อ refresh"
+            : "Token expired.\nRun claude in a terminal to refresh it",
         FetchStatus.RateLimited => Th ? "ถูกจำกัดการเรียก (429)" : "Rate limited (429)",
         FetchStatus.NetworkError => Th ? "เชื่อมต่อไม่ได้" : "Connection failed",
         FetchStatus.HttpError => Th

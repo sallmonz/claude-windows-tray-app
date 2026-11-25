@@ -17,7 +17,8 @@ The popup follows the Windows light/dark theme until you pick light or dark with
 
 1. Download `ClaudeUsageTray-Setup.exe` from the [latest release](https://github.com/sallmonz/claude-windows-tray-app/releases/latest).
 2. Run it. No admin rights are needed. It installs to `%LOCALAPPDATA%\Programs\ClaudeUsageTray`,
-   adds a Start menu shortcut, and can turn on **Start with Windows**.
+   adds a Start menu shortcut, and can turn on **Start with Windows** and **Show the icon on the taskbar**
+   (so it is not hidden under ^ on Windows 11). A running copy is closed automatically.
 3. If the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64) is missing,
    setup offers to open the download page.
 
@@ -79,7 +80,7 @@ Output: `src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe`
 Build the installer (uses [Inno Setup](https://jrsoftware.org/isinfo.php), installs it with winget or Chocolatey if missing):
 
 ```powershell
-./installer/build.ps1 -Version 1.1.0
+./installer/build.ps1 -Version 1.2.0
 ```
 
 Output: `installer/Output/ClaudeUsageTray-Setup.exe`. The installer settings are in `installer/ClaudeUsageTray.iss`.
@@ -112,6 +113,8 @@ On GitHub, go to **Releases > Draft a new release**, create a tag like `v1.0.0`,
 src/ClaudeUsageTray.Core/   Models, JSON parsing, countdown text, UsageClient (no UI, cross-platform)
 src/ClaudeUsageTray/        WinForms tray app: Program, TrayApp, UsagePopup, IconRenderer
 tests/ClaudeUsageTray.Tests xUnit tests for the Core project
+installer/                  Inno Setup script and build script
+assets/                     App icon (app.ico) and the script that draws it
 ```
 
 ## Dependencies and license

@@ -1,10 +1,10 @@
 ; Inno Setup script for Claude Usage Tray.
 ; Build locally (after dotnet publish):
-;   iscc installer\ClaudeUsageTray.iss /DAppVersion=1.1.0
+;   iscc installer\ClaudeUsageTray.iss /DAppVersion=1.2.0
 ; The Release workflow on GitHub runs the same command and attaches the result.
 
 #ifndef AppVersion
-  #define AppVersion "1.1.0"
+  #define AppVersion "1.2.0"
 #endif
 #ifndef SourceExe
   #define SourceExe "..\src\ClaudeUsageTray\bin\publish\win-x64\ClaudeUsageTray.exe"
@@ -34,9 +34,9 @@ UninstallDisplayName={#AppName}
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
-; Close the running tray app before installing or uninstalling (same mutex as Program.cs).
-AppMutex=Local\ClaudeUsageTray.SingleInstance
-CloseApplications=yes
+; A running copy is closed by [Code] below instead of asking the user to close it.
+CloseApplications=no
+SetupIconFile=..\assets\app.ico
 OutputDir=Output
 OutputBaseFilename=ClaudeUsageTray-Setup
 LicenseFile=..\LICENSE
@@ -49,6 +49,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "startup"; Description: "Start with Windows"; GroupDescription: "Options:"
+Name: "showicon"; Description: "Show the icon on the taskbar (not hidden under ^)"; GroupDescription: "Options:"
 
 [Files]
 Source: "{#SourceExe}"; DestDir: "{app}"; Flags: ignoreversion
@@ -62,11 +63,36 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
   ValueName: "ClaudeUsageTray"; ValueData: """{app}\{#AppExe}"""; Tasks: startup
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "ClaudeUsageTray"; \
   Flags: uninsdeletevalue dontcreatekey
+; Asks the app to move its tray icon out of the ^ overflow once, on its next start (see TrayIconPromoter.cs).
+Root: HKCU; Subkey: "Software\ClaudeUsageTray"; ValueType: dword; ValueName: "PromoteTrayIcon"; ValueData: 1; \
+  Tasks: showicon
+Root: HKCU; Subkey: "Software\ClaudeUsageTray"; Flags: uninsdeletekey
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// Force-close a running copy so install and uninstall never stop to ask.
+procedure CloseRunningApp;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#AppExe}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  CloseRunningApp;
+  Result := '';
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  // usUninstall comes after the user confirmed "remove", before files are deleted.
+  if CurUninstallStep = usUninstall then
+    CloseRunningApp;
+end;
+
 // The app needs the .NET 10 Desktop Runtime (x64). Offer the download page if it is missing.
 function HasDesktopRuntime: Boolean;
 var

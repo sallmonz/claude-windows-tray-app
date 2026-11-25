@@ -1,7 +1,7 @@
 # Builds installer\Output\ClaudeUsageTray-Setup.exe from the published exe.
 # Run "dotnet publish src/ClaudeUsageTray -p:PublishProfile=win-x64" first.
 # Installs Inno Setup with Chocolatey or winget if it is not found.
-param([string]$Version = "1.1.0")
+param([string]$Version = "1.2.0")
 $ErrorActionPreference = "Stop"
 
 function Find-Iscc {

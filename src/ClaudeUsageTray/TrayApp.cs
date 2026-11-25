@@ -13,6 +13,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly NotifyIcon _tray;
     private readonly System.Windows.Forms.Timer _timer = new();
     private readonly UsagePopup _popup = new();
+    private readonly TrayIconPromoter _promoter = new();
     private Icon? _icon;
     private bool _refreshing;
 
@@ -48,6 +49,7 @@ internal sealed class TrayApp : ApplicationContext
         _timer.Start();
 
         UpdateUi();
+        _promoter.Start();
         _ = RefreshAsync();
     }
 
@@ -182,6 +184,7 @@ internal sealed class TrayApp : ApplicationContext
             _timer.Dispose();
             _tray.Dispose();
             _popup.Dispose();
+            _promoter.Dispose();
             _icon?.Dispose();
         }
         base.Dispose(disposing);

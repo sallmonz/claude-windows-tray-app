@@ -23,3 +23,11 @@ jobs:
 
       - name: Test
         run: dotnet test -c Release --no-build
+
+      # Build the exe and the installer too, so a broken installer script shows up before a release.
+      - name: Publish
+        run: dotnet publish src/ClaudeUsageTray -p:PublishProfile=win-x64
+
+      - name: Build installer
+        shell: pwsh
+        run: ./installer/build.ps1 -Version 0.0.0

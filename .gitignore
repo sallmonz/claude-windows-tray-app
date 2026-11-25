@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Keep the shared publish profile
 !src/ClaudeUsageTray/Properties/PublishProfiles/win-x64.pubxml
+
+# Inno Setup output
+installer/Output/

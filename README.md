@@ -13,23 +13,33 @@ The popup follows the Windows light/dark theme until you pick light or dark with
 
 ## Download and install
 
-1. Install the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64), if you do not have it.
-2. Download `ClaudeUsageTray.exe` from the [latest release](../../releases/latest).
-3. Put it in a folder that will not move, for example `%LOCALAPPDATA%\Programs\ClaudeUsageTray\`.
-4. Run it, then right-click the tray icon and turn on **Start with Windows**.
+### Installer (recommended)
 
-The exe is not code-signed, so Windows SmartScreen may warn the first time. Click **More info**, then **Run anyway**.
+1. Download `ClaudeUsageTray-Setup.exe` from the [latest release](https://github.com/sallmonz/claude-windows-tray-app/releases/latest).
+2. Run it. No admin rights are needed. It installs to `%LOCALAPPDATA%\Programs\ClaudeUsageTray`,
+   adds a Start menu shortcut, and can turn on **Start with Windows**.
+3. If the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64) is missing,
+   setup offers to open the download page.
+
+To update, run the new setup. To remove it, use **Settings > Apps > Installed apps**.
+
+### Portable exe
+
+Download `ClaudeUsageTray.exe` instead, put it in a folder that will not move, run it, then right-click the
+tray icon and turn on **Start with Windows**. It needs the .NET 10 Desktop Runtime too.
+
+The files are not code-signed, so Windows SmartScreen may warn the first time. Click **More info**, then **Run anyway**.
 
 ### Check the download (optional)
 
-Each release has a `ClaudeUsageTray.exe.sha256` file and a GitHub build attestation.
+Each file has a `.sha256` file and a GitHub build attestation.
 
 ```powershell
-Get-FileHash .\ClaudeUsageTray.exe -Algorithm SHA256   # compare with the .sha256 file
-gh attestation verify .\ClaudeUsageTray.exe --repo sallmonz/claude-windows-tray-app
+Get-FileHash .\ClaudeUsageTray-Setup.exe -Algorithm SHA256   # compare with the .sha256 file
+gh attestation verify .\ClaudeUsageTray-Setup.exe --repo sallmonz/claude-windows-tray-app
 ```
 
-The attestation proves the exe was built by this repository's `Release` workflow from public source.
+The attestation proves the file was built by this repository's `Release` workflow from public source.
 
 ## Requirements
 
@@ -66,6 +76,14 @@ dotnet publish src/ClaudeUsageTray -p:PublishProfile=win-x64
 
 Output: `src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe`
 
+Build the installer (uses [Inno Setup](https://jrsoftware.org/isinfo.php), installs it with winget or Chocolatey if missing):
+
+```powershell
+./installer/build.ps1 -Version 1.1.0
+```
+
+Output: `installer/Output/ClaudeUsageTray-Setup.exe`. The installer settings are in `installer/ClaudeUsageTray.iss`.
+
 ## Make a release (maintainers)
 
 On GitHub, go to **Releases > Draft a new release**, create a tag like `v1.0.0`, click
@@ -99,6 +117,7 @@ tests/ClaudeUsageTray.Tests xUnit tests for the Core project
 ## Dependencies and license
 
 The app uses only the .NET base class library, with no extra NuGet packages.
-The test project uses xUnit (Apache-2.0) and Microsoft.NET.Test.Sdk (MIT). These are not part of the app.
+The test project uses xUnit (Apache-2.0) and Microsoft.NET.Test.Sdk (MIT). The installer is built with
+Inno Setup (free, its own permissive license). None of these are part of the app itself.
 
 This project is released under the [MIT License](LICENSE). It is not affiliated with Anthropic.

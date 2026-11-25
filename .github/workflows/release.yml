@@ -1,13 +1,16 @@
 name: Release
 
 # Publish a release on GitHub (Releases > Draft a new release, tag like v1.0.0).
-# This workflow then builds ClaudeUsageTray.exe and attaches it to that release.
+# This workflow then builds ClaudeUsageTray.exe, attaches it with a SHA256 file,
+# and records a build provenance attestation that proves it was built here.
 on:
   release:
     types: [published]
 
 permissions:
-  contents: write
+  contents: write      # upload files to the release
+  id-token: write      # sign the attestation
+  attestations: write  # store the attestation
 
 jobs:
   build:
@@ -28,10 +31,24 @@ jobs:
           $version = "${{ github.event.release.tag_name }}".TrimStart('v')
           dotnet publish src/ClaudeUsageTray -p:PublishProfile=win-x64 -p:Version=$version
 
-      - name: Attach exe to release
+      - name: Create SHA256 file
+        shell: pwsh
+        working-directory: src/ClaudeUsageTray/bin/publish/win-x64
+        run: |
+          $hash = (Get-FileHash ClaudeUsageTray.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  ClaudeUsageTray.exe" | Out-File ClaudeUsageTray.exe.sha256 -Encoding ascii -NoNewline
+          "SHA256: $hash" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe
+
+      - name: Attach files to release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+        working-directory: src/ClaudeUsageTray/bin/publish/win-x64
         run: |
           gh release upload "${{ github.event.release.tag_name }}" `
-            src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe --clobber
+            ClaudeUsageTray.exe ClaudeUsageTray.exe.sha256 --clobber

@@ -20,6 +20,17 @@ The popup follows the Windows light/dark theme until you pick light or dark with
 
 The exe is not code-signed, so Windows SmartScreen may warn the first time. Click **More info**, then **Run anyway**.
 
+### Check the download (optional)
+
+Each release has a `ClaudeUsageTray.exe.sha256` file and a GitHub build attestation.
+
+```powershell
+Get-FileHash .\ClaudeUsageTray.exe -Algorithm SHA256   # compare with the .sha256 file
+gh attestation verify .\ClaudeUsageTray.exe --repo sallmonz/claude-windows-tray-app
+```
+
+The attestation proves the exe was built by this repository's `Release` workflow from public source.
+
 ## Requirements
 
 - Windows 10 or 11

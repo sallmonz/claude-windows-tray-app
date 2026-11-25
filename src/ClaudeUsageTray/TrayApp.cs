@@ -11,13 +11,13 @@ internal sealed class TrayApp : ApplicationContext
     private readonly UsageClient _client = new(Logger.Write);
     private readonly UsageState _state = new();
     private readonly NotifyIcon _tray;
-    private readonly NativeTrayMenu _menu = new();
     private readonly System.Windows.Forms.Timer _timer = new();
     private readonly UsagePopup _popup = new();
     private Icon? _icon;
     private bool _refreshing;
 
     private Strings S => Strings.For(_settings.Language);
+    private Theme CurrentTheme => Theme.For(_settings.Theme);
 
     public TrayApp()
     {
@@ -33,6 +33,12 @@ internal sealed class TrayApp : ApplicationContext
         _popup.LanguageRequested += (_, lang) =>
         {
             _settings.Language = lang;
+            _settings.Save();
+            UpdateUi();
+        };
+        _popup.ThemeRequested += (_, mode) =>
+        {
+            _settings.Theme = mode;
             _settings.Save();
             UpdateUi();
         };
@@ -53,21 +59,25 @@ internal sealed class TrayApp : ApplicationContext
         if (_popup.Visible)
             _popup.Hide();
         else if (!_popup.WasJustHidden()) // the click itself closed it via Deactivate
+        {
+            UpdateUi(); // picks up a Windows theme change
             _popup.ShowNearTray();
+        }
     }
 
     private void ShowMenu()
     {
         _popup.Hide();
         var s = S;
-        _menu.Show(
+        bool startup = StartupRegistry.IsEnabled();
+        var menu = new TrayMenu(
         [
-            new(s.MenuRefresh, () => _ = RefreshAsync(), Enabled: !_refreshing),
-            new(s.MenuStartWithWindows, () => StartupRegistry.SetEnabled(!StartupRegistry.IsEnabled()),
-                Checked: StartupRegistry.IsEnabled()),
+            new(s.MenuRefresh, "\uE72C", () => _ = RefreshAsync(), Enabled: !_refreshing),
+            new(s.MenuStartWithWindows, startup ? "\uE73E" : "", () => StartupRegistry.SetEnabled(!startup)),
             null,
-            new(s.MenuExit, ExitThread),
-        ], Cursor.Position);
+            new(s.MenuExit, "\uE7E8", ExitThread),
+        ], CurrentTheme, _settings.Language);
+        menu.ShowAt(Cursor.Position);
     }
 
     private async Task RefreshAsync()
@@ -114,7 +124,7 @@ internal sealed class TrayApp : ApplicationContext
             _icon = newIcon;
             _tray.Text = TooltipText(s);
 
-            _popup.SetData(_state, s, _refreshing);
+            _popup.SetData(_state, s, _refreshing, CurrentTheme);
         }
         catch (Exception ex)
         {
@@ -151,7 +161,6 @@ internal sealed class TrayApp : ApplicationContext
         {
             _timer.Dispose();
             _tray.Dispose();
-            _menu.Dispose();
             _popup.Dispose();
             _icon?.Dispose();
         }

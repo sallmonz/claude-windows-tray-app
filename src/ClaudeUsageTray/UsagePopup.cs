@@ -1,9 +1,7 @@
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Globalization;
-using System.Runtime.InteropServices;
 using ClaudeUsageTray.Core;
-using Microsoft.Win32;
 
 namespace ClaudeUsageTray;
 
@@ -11,7 +9,7 @@ namespace ClaudeUsageTray;
 /// Borderless popup above the tray. Everything is painted by hand in logical 96-DPI units
 /// and scaled to the monitor DPI.
 /// </summary>
-internal sealed partial class UsagePopup : Form
+internal sealed class UsagePopup : Form
 {
     // Logical layout (96 DPI).
     private const float W = 320, Pad = 16;
@@ -19,16 +17,19 @@ internal sealed partial class UsagePopup : Form
 
     private static readonly RectangleF RefreshRect = new(W - Pad - 24, 12, 24, 24);
     private static readonly RectangleF LangRect = new(RefreshRect.Left - 8 - 64, 13, 64, 22);
+    private static readonly RectangleF ThemeRect = new(LangRect.Left - 8 - 56, 13, 56, 22);
+    private static RectangleF SunRect => new(ThemeRect.Left, ThemeRect.Top, ThemeRect.Width / 2, ThemeRect.Height);
+    private static RectangleF MoonRect => new(ThemeRect.Left + ThemeRect.Width / 2, ThemeRect.Top, ThemeRect.Width / 2, ThemeRect.Height);
     private static RectangleF EnRect => new(LangRect.Left, LangRect.Top, LangRect.Width / 2, LangRect.Height);
     private static RectangleF ThRect => new(LangRect.Left + LangRect.Width / 2, LangRect.Top, LangRect.Width / 2, LangRect.Height);
 
-    private enum Hit { None, Refresh, En, Th }
+    private enum Hit { None, Refresh, En, Th, Sun, Moon }
 
     private readonly System.Windows.Forms.Timer _tick = new() { Interval = 30_000 };
     private UsageState _state = new();
     private Strings _s = Strings.English;
     private bool _refreshing;
-    private Theme _theme = Theme.Read();
+    private Theme _theme = Theme.Light;
     private PopupFonts _fonts = new(Language.English);
     private Hit _hover;
     private long _hiddenAt;
@@ -36,6 +37,7 @@ internal sealed partial class UsagePopup : Form
 
     public event EventHandler? RefreshRequested;
     public event EventHandler<Language>? LanguageRequested;
+    public event EventHandler<ThemeMode>? ThemeRequested;
 
     public UsagePopup()
     {
@@ -55,11 +57,9 @@ internal sealed partial class UsagePopup : Form
     {
         get
         {
-            const int WS_EX_TOOLWINDOW = 0x80; // keep out of Alt+Tab
-            const int CS_DROPSHADOW = 0x20000;
             var cp = base.CreateParams;
-            cp.ExStyle |= WS_EX_TOOLWINDOW;
-            cp.ClassStyle |= CS_DROPSHADOW;
+            cp.ExStyle |= Native.WS_EX_TOOLWINDOW;
+            cp.ClassStyle |= Native.CS_DROPSHADOW;
             return cp;
         }
     }
@@ -71,9 +71,11 @@ internal sealed partial class UsagePopup : Form
     /// <summary>True if the popup closed a moment ago (the same tray click that should not reopen it).</summary>
     public bool WasJustHidden() => Environment.TickCount64 - _hiddenAt < 300;
 
-    public void SetData(UsageState state, Strings strings, bool refreshing)
+    public void SetData(UsageState state, Strings strings, bool refreshing, Theme theme)
     {
         _state = state;
+        _theme = theme;
+        BackColor = theme.Background;
         _refreshing = refreshing;
         if (_s != strings)
         {
@@ -87,12 +89,10 @@ internal sealed partial class UsagePopup : Form
 
     public void ShowNearTray()
     {
-        _theme = Theme.Read();
-        BackColor = _theme.Background;
         UpdateLayoutAndPosition();
         Show();
         Activate();
-        SetForegroundWindow(Handle);
+        Native.SetForegroundWindow(Handle);
         _tick.Start();
     }
 
@@ -100,8 +100,7 @@ internal sealed partial class UsagePopup : Form
     {
         base.OnHandleCreated(e);
         // Rounded corners on Windows 11. Ignored on Windows 10.
-        int round = 2; // DWMWCP_ROUND
-        _ = DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int));
+        Native.SetCornerPreference(Handle, Native.DWMWCP_ROUND);
     }
 
     protected override void OnDeactivate(EventArgs e)
@@ -151,6 +150,8 @@ internal sealed partial class UsagePopup : Form
         if (RefreshRect.Contains(pt)) return Hit.Refresh;
         if (EnRect.Contains(pt)) return Hit.En;
         if (ThRect.Contains(pt)) return Hit.Th;
+        if (SunRect.Contains(pt)) return Hit.Sun;
+        if (MoonRect.Contains(pt)) return Hit.Moon;
         return Hit.None;
     }
 
@@ -186,6 +187,12 @@ internal sealed partial class UsagePopup : Form
                 break;
             case Hit.Th when _s.Language != Language.Thai:
                 LanguageRequested?.Invoke(this, Language.Thai);
+                break;
+            case Hit.Sun when _theme.IsDark:
+                ThemeRequested?.Invoke(this, ThemeMode.Light);
+                break;
+            case Hit.Moon when !_theme.IsDark:
+                ThemeRequested?.Invoke(this, ThemeMode.Dark);
                 break;
         }
     }
@@ -268,6 +275,13 @@ internal sealed partial class UsagePopup : Form
         DrawSegment(g, EnRect, "EN", _s.Language == Language.English, _hover == Hit.En);
         DrawSegment(g, ThRect, "TH", _s.Language == Language.Thai, _hover == Hit.Th);
 
+        // Sun | Moon theme switch.
+        using (var chip = IconRenderer.RoundedRect(ThemeRect, 5))
+        using (var chipBrush = new SolidBrush(_theme.Chip))
+            g.FillPath(chipBrush, chip);
+        DrawSegment(g, SunRect, "\uE706", !_theme.IsDark, _hover == Hit.Sun, _fonts.SmallGlyph);
+        DrawSegment(g, MoonRect, "\uE708", _theme.IsDark, _hover == Hit.Moon, _fonts.SmallGlyph);
+
         // Refresh button.
         if (_hover == Hit.Refresh && !_refreshing)
         {
@@ -279,7 +293,7 @@ internal sealed partial class UsagePopup : Form
         DrawCenteredIn(g, "", _fonts.Glyph, glyphColor, RefreshRect);
     }
 
-    private void DrawSegment(Graphics g, RectangleF r, string text, bool selected, bool hover)
+    private void DrawSegment(Graphics g, RectangleF r, string text, bool selected, bool hover, Font? font = null)
     {
         var inner = RectangleF.Inflate(r, -2, -2);
         if (selected || hover)
@@ -288,7 +302,7 @@ internal sealed partial class UsagePopup : Form
             using var b = new SolidBrush(selected ? _theme.ChipSelected : Color.FromArgb(60, _theme.ChipSelected));
             g.FillPath(b, path);
         }
-        DrawCenteredIn(g, text, selected ? _fonts.SegmentOn : _fonts.Segment,
+        DrawCenteredIn(g, text, font ?? (selected ? _fonts.SegmentOn : _fonts.Segment),
             selected ? _theme.Text : _theme.SubText, inner);
     }
 
@@ -495,44 +509,7 @@ internal sealed partial class UsagePopup : Form
         base.Dispose(disposing);
     }
 
-    [LibraryImport("dwmapi.dll")]
-    private static partial int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
-
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetForegroundWindow(IntPtr hWnd);
-
-    // ---------- Theme & fonts ----------
-
-    private sealed record Theme(
-        Color Background, Color Text, Color SubText, Color Track, Color Divider,
-        Color Border, Color Chip, Color ChipSelected, Color Warning)
-    {
-        private static readonly Theme Dark = new(
-            Hex(0x202020), Hex(0xFFFFFF), Hex(0xA0A0A0), Hex(0x3A3A3A), Hex(0x333333),
-            Hex(0x3C3C3C), Hex(0x2D2D2D), Hex(0x4A4A4A), Hex(0xE3A008));
-
-        private static readonly Theme Light = new(
-            Hex(0xF9F9F9), Hex(0x1A1A1A), Hex(0x606060), Hex(0xE1E1E1), Hex(0xE5E5E5),
-            Hex(0xD0D0D0), Hex(0xECECEC), Hex(0xFFFFFF), Hex(0x9A6700));
-
-        private static Color Hex(int rgb) => Color.FromArgb(255, Color.FromArgb(rgb));
-
-        /// <summary>Follows the Windows app theme (light or dark).</summary>
-        public static Theme Read()
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(
-                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-                return key?.GetValue("AppsUseLightTheme") is int light && light == 0 ? Dark : Light;
-            }
-            catch
-            {
-                return Light;
-            }
-        }
-    }
+    // ---------- Fonts ----------
 
     private sealed class PopupFonts : IDisposable
     {
@@ -549,12 +526,13 @@ internal sealed partial class UsagePopup : Form
         public Font WeekPercent { get; }
         public Font Glyph { get; }
         public Font BigGlyph { get; }
+        public Font SmallGlyph { get; }
 
         public PopupFonts(Language language)
         {
             // Segoe UI has no Thai glyphs; Leelawadee UI ships with Windows and covers Thai and Latin.
             bool th = language == Language.Thai;
-            string ui = th ? "Leelawadee UI" : "Segoe UI";
+            string ui = Theme.UiFont(language);
             Font Ui(float px, bool bold = false) => th
                 ? new Font(ui, px, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel)
                 : new Font(bold ? "Segoe UI Semibold" : ui, px, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -571,14 +549,15 @@ internal sealed partial class UsagePopup : Form
             RingPercent = Px("Segoe UI", 14);
             WeekNumber = Px("Segoe UI Semibold", 26);
             WeekPercent = Px("Segoe UI", 13);
-            Glyph = Px("Segoe MDL2 Assets", 14);
-            BigGlyph = Px("Segoe MDL2 Assets", 28);
+            Glyph = Px(Theme.IconFont, 14);
+            BigGlyph = Px(Theme.IconFont, 28);
+            SmallGlyph = Px(Theme.IconFont, 12);
         }
 
         public void Dispose()
         {
             foreach (var f in new[] { Title, Label, Strong, Small, Footer, Segment, SegmentOn,
-                         RingNumber, RingPercent, WeekNumber, WeekPercent, Glyph, BigGlyph })
+                         RingNumber, RingPercent, WeekNumber, WeekPercent, Glyph, BigGlyph, SmallGlyph })
                 f.Dispose();
         }
     }

@@ -17,6 +17,9 @@ internal sealed class AppSettings
 
     private static string FilePath => Path.Combine(Logger.Directory, "settings.json");
 
+    /// <summary>System until the user picks light or dark in the popup.</summary>
+    public ThemeMode Theme { get; set; } = ThemeMode.System;
+
     public Language Language { get; set; } =
         CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "th" ? Language.Thai : Language.English;
 

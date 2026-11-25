@@ -8,7 +8,7 @@ A small Windows system tray app that shows your Claude usage limits:
 
 The tray icon shows the 5-hour percent (green < 50%, orange 50–80%, red > 80%, gray when data is stale).
 Left-click opens the popup. Right-click opens the menu: **Refresh now**, **Start with Windows**, **Exit**.
-The popup follows the Windows light/dark theme and can switch between English and Thai.
+The popup follows the Windows light/dark theme until you pick light or dark with the sun/moon switch, and can switch between English and Thai.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ Output: `src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe`
 | Path | What |
 | --- | --- |
 | `%LOCALAPPDATA%\ClaudeUsageTray\log.txt` | Error log |
-| `%LOCALAPPDATA%\ClaudeUsageTray\settings.json` | Language setting |
+| `%LOCALAPPDATA%\ClaudeUsageTray\settings.json` | Language and theme settings |
 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\ClaudeUsageTray` | Start with Windows |
 
 ## Project layout

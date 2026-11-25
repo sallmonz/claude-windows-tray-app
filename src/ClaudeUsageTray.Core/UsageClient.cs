@@ -122,9 +122,9 @@ public sealed class UsageClient
             }
 
             var json = await File.ReadAllTextAsync(_credentialsPath, ct).ConfigureAwait(false);
-            var creds = UsageParser.ParseCredentials(json);
+            var creds = UsageParser.ParseCredentials(json, out var problem);
             if (creds is null)
-                _log("Credentials file has no claudeAiOauth.accessToken.");
+                _log($"Credentials file has no usable claudeAiOauth.accessToken: {problem}");
             return creds;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

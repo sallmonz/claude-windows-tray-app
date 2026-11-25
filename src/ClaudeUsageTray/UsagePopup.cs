@@ -209,7 +209,10 @@ internal sealed partial class UsagePopup : Form
                 return HeaderBottom + 100;
             case Mode.Error:
                 var msg = ErrorText();
-                return HeaderBottom + 12 + 32 + 12 + Measure(g, msg, _fonts.Strong, ContentWidth).Height + 24;
+                float eh = HeaderBottom + 12 + 32 + 12 + Measure(g, msg, _fonts.Strong, ContentWidth).Height + 24;
+                if (ErrorDetail() is { } detail)
+                    eh += Measure(g, detail, _fonts.Footer, ContentWidth).Height + 6;
+                return eh;
             default:
                 float y = DataFooterTop + 8;
                 if (StaleText() is { } stale)
@@ -375,7 +378,21 @@ internal sealed partial class UsagePopup : Form
         using var sf = new StringFormat { Alignment = StringAlignment.Center };
         using var b = new SolidBrush(_theme.Text);
         g.DrawString(msg, _fonts.Strong, b, new RectangleF(Pad, y, ContentWidth, h + 2), sf);
+
+        if (ErrorDetail() is { } detail)
+        {
+            y += h + 6;
+            var dh = Measure(g, detail, _fonts.Footer, ContentWidth).Height;
+            using var sub = new SolidBrush(_theme.SubText);
+            g.DrawString(detail, _fonts.Footer, sub, new RectangleF(Pad, y, ContentWidth, dh + 2), sf);
+        }
     }
+
+    /// <summary>Shows where the app looked for the token, so login problems are easy to check.</summary>
+    private static string? ErrorDetailFor(FetchStatus status) =>
+        status == FetchStatus.NoCredentials ? UsageClient.DefaultCredentialsPath : null;
+
+    private string? ErrorDetail() => _state.LastError is { } err ? ErrorDetailFor(err.Status) : null;
 
     private string ErrorText() =>
         _state.LastError is { } err ? _s.Error(err.Status, err.HttpStatusCode) : "";

@@ -74,33 +74,90 @@ public static class UsageParser
     /// Reads claudeAiOauth.accessToken and claudeAiOauth.expiresAt (Unix ms) from .credentials.json.
     /// Returns null when the file has no usable token.
     /// </summary>
-    public static OAuthCredentials? ParseCredentials(string json)
+    public static OAuthCredentials? ParseCredentials(string json) => ParseCredentials(json, out _);
+
+    /// <summary>
+    /// Same as <see cref="ParseCredentials(string)"/>, and on failure explains why in <paramref name="problem"/>.
+    /// The explanation only has key names and value types, never secret values, so it is safe to log.
+    /// Key names are matched case-insensitively, and comments and trailing commas are allowed.
+    /// </summary>
+    public static OAuthCredentials? ParseCredentials(string json, out string? problem)
     {
+        problem = null;
+        JsonDocument doc;
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
-                !doc.RootElement.TryGetProperty("claudeAiOauth", out var oauth) ||
-                oauth.ValueKind != JsonValueKind.Object ||
-                !oauth.TryGetProperty("accessToken", out var tokenEl) ||
-                tokenEl.ValueKind != JsonValueKind.String)
-                return null;
-
-            var token = tokenEl.GetString();
-            if (string.IsNullOrWhiteSpace(token))
-                return null;
-
-            DateTimeOffset? expiresAt = null;
-            if (oauth.TryGetProperty("expiresAt", out var exp) &&
-                exp.ValueKind == JsonValueKind.Number &&
-                exp.TryGetInt64(out var ms))
-                expiresAt = DateTimeOffset.FromUnixTimeMilliseconds(ms);
-
-            return new OAuthCredentials(token, expiresAt);
+            doc = JsonDocument.Parse(json.TrimStart('\uFEFF'), new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip,
+            });
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            problem = $"not valid JSON (line {ex.LineNumber + 1}, byte {ex.BytePositionInLine}), length {json.Length}";
             return null;
         }
+
+        using (doc)
+        {
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                problem = $"root is {root.ValueKind}, not an object";
+                return null;
+            }
+
+            if (FindProperty(root, "claudeAiOauth") is not { } oauth)
+            {
+                problem = $"no 'claudeAiOauth' key. Top-level keys: {DescribeKeys(root)}";
+                return null;
+            }
+            if (oauth.ValueKind != JsonValueKind.Object)
+            {
+                problem = $"'claudeAiOauth' is {oauth.ValueKind}, not an object";
+                return null;
+            }
+
+            if (FindProperty(oauth, "accessToken") is not { } tokenEl)
+            {
+                problem = $"no 'accessToken' key. claudeAiOauth keys: {DescribeKeys(oauth)}";
+                return null;
+            }
+            if (tokenEl.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(tokenEl.GetString()))
+            {
+                problem = $"'accessToken' is {tokenEl.ValueKind} or empty";
+                return null;
+            }
+
+            DateTimeOffset? expiresAt = null;
+            if (FindProperty(oauth, "expiresAt") is { } exp)
+            {
+                if (exp.ValueKind == JsonValueKind.Number && exp.TryGetDouble(out var ms))
+                    expiresAt = DateTimeOffset.FromUnixTimeMilliseconds((long)ms);
+                else if (exp.ValueKind == JsonValueKind.String &&
+                         long.TryParse(exp.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var msText))
+                    expiresAt = DateTimeOffset.FromUnixTimeMilliseconds(msText);
+            }
+
+            return new OAuthCredentials(tokenEl.GetString()!, expiresAt);
+        }
+    }
+
+    /// <summary>Exact match first, then case-insensitive.</summary>
+    private static JsonElement? FindProperty(JsonElement obj, string name)
+    {
+        if (obj.TryGetProperty(name, out var exact))
+            return exact;
+        foreach (var p in obj.EnumerateObject())
+            if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                return p.Value;
+        return null;
+    }
+
+    private static string DescribeKeys(JsonElement obj)
+    {
+        var keys = obj.EnumerateObject().Select(p => $"{p.Name}({p.Value.ValueKind})").ToList();
+        return keys.Count == 0 ? "(none)" : string.Join(", ", keys);
     }
 }

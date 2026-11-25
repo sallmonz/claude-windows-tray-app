@@ -89,6 +89,28 @@ public class UsageParserTests
         Assert.Null(creds.ExpiresAt);
     }
 
+    [Fact]
+    public void ParseCredentials_IsLenientLikePowerShell()
+    {
+        // BOM, different key case, comment, trailing comma, expiresAt as float.
+        const string json = "\uFEFF{ // written by a tool\n \"ClaudeAiOauth\": { \"AccessToken\": \"t\", \"expiresAt\": 1764000000000.0, }, }";
+
+        var creds = UsageParser.ParseCredentials(json);
+
+        Assert.Equal("t", creds!.AccessToken);
+        Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1764000000000), creds.ExpiresAt);
+    }
+
+    [Fact]
+    public void ParseCredentials_Failure_ExplainsWithoutSecrets()
+    {
+        const string json = """{ "claudeAiOauth": { "token": "secret-value" }, "mcpOAuth": {} }""";
+
+        Assert.Null(UsageParser.ParseCredentials(json, out var problem));
+        Assert.Contains("claudeAiOauth keys: token(String)", problem);
+        Assert.DoesNotContain("secret-value", problem);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("{")]

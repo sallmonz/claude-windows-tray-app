@@ -11,6 +11,15 @@ The right-click menu lets you pick which window the icon shows (5-hour or weekly
 Left-click opens the popup. Right-click opens the menu: **Refresh now**, icon options, **Start with Windows**, **Exit**.
 The popup follows the Windows light/dark theme until you pick light or dark with the sun/moon switch, and can switch between English and Thai.
 
+## Download and install
+
+1. Install the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64), if you do not have it.
+2. Download `ClaudeUsageTray.exe` from the [latest release](../../releases/latest).
+3. Put it in a folder that will not move, for example `%LOCALAPPDATA%\Programs\ClaudeUsageTray\`.
+4. Run it, then right-click the tray icon and turn on **Start with Windows**.
+
+The exe is not code-signed, so Windows SmartScreen may warn the first time. Click **More info**, then **Run anyway**.
+
 ## Requirements
 
 - Windows 10 or 11
@@ -45,6 +54,11 @@ dotnet publish src/ClaudeUsageTray -p:PublishProfile=win-x64
 ```
 
 Output: `src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe`
+
+## Make a release (maintainers)
+
+On GitHub, go to **Releases > Draft a new release**, create a tag like `v1.0.0`, click
+**Generate release notes**, then **Publish release**. The `Release` workflow builds the exe and attaches it.
 
 ## Limitations
 

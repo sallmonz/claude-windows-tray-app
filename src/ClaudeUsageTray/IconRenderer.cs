@@ -69,7 +69,8 @@ internal static partial class IconRenderer
             // shrinking the whole thing; the digits keep their height. The squeeze is capped so
             // the text never looks distorted.
             var b = path.GetBounds();
-            float maxW = size - 1f, maxH = size - 2f;
+            float pad = size / 8f; // same breathing room on every side (2px at 16px)
+            float maxW = size - pad * 2, maxH = size - pad * 2;
             float scaleY = Math.Min(1f, maxH / b.Height);
             float scaleX = Math.Min(scaleY, maxW / b.Width);
             const float MaxSqueeze = 0.7f; // width may shrink to 70% of the height scale

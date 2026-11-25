@@ -1,8 +1,8 @@
 name: Release
 
 # Publish a release on GitHub (Releases > Draft a new release, tag like v1.0.0).
-# This workflow then builds ClaudeUsageTray.exe, attaches it with a SHA256 file,
-# and records a build provenance attestation that proves it was built here.
+# This workflow then builds the installer (ClaudeUsageTray-Setup.exe) and the portable exe,
+# attaches both with SHA256 files, and records a build provenance attestation for them.
 on:
   release:
     types: [published]
@@ -31,24 +31,39 @@ jobs:
           $version = "${{ github.event.release.tag_name }}".TrimStart('v')
           dotnet publish src/ClaudeUsageTray -p:PublishProfile=win-x64 -p:Version=$version
 
-      - name: Create SHA256 file
+      - name: Build installer
         shell: pwsh
-        working-directory: src/ClaudeUsageTray/bin/publish/win-x64
         run: |
-          $hash = (Get-FileHash ClaudeUsageTray.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  ClaudeUsageTray.exe" | Out-File ClaudeUsageTray.exe.sha256 -Encoding ascii -NoNewline
-          "SHA256: $hash" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          $version = "${{ github.event.release.tag_name }}".TrimStart('v')
+          ./installer/build.ps1 -Version $version
+
+      - name: Collect files and SHA256
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe dist/
+          Copy-Item installer/Output/ClaudeUsageTray-Setup.exe dist/
+          Push-Location dist
+          foreach ($f in "ClaudeUsageTray-Setup.exe", "ClaudeUsageTray.exe") {
+            $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $f" | Out-File "$f.sha256" -Encoding ascii -NoNewline
+            "$f SHA256: $hash" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          }
+          Pop-Location
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: src/ClaudeUsageTray/bin/publish/win-x64/ClaudeUsageTray.exe
+          subject-path: |
+            dist/ClaudeUsageTray-Setup.exe
+            dist/ClaudeUsageTray.exe
 
       - name: Attach files to release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        working-directory: src/ClaudeUsageTray/bin/publish/win-x64
+        working-directory: dist
         run: |
           gh release upload "${{ github.event.release.tag_name }}" `
+            ClaudeUsageTray-Setup.exe ClaudeUsageTray-Setup.exe.sha256 `
             ClaudeUsageTray.exe ClaudeUsageTray.exe.sha256 --clobber

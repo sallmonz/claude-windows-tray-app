@@ -11,10 +11,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly UsageClient _client = new(Logger.Write);
     private readonly UsageState _state = new();
     private readonly NotifyIcon _tray;
-    private readonly ContextMenuStrip _menu = new();
-    private readonly ToolStripMenuItem _refreshItem = new();
-    private readonly ToolStripMenuItem _startupItem = new() { CheckOnClick = false };
-    private readonly ToolStripMenuItem _exitItem = new();
+    private readonly NativeTrayMenu _menu = new();
     private readonly System.Windows.Forms.Timer _timer = new();
     private readonly UsagePopup _popup = new();
     private Icon? _icon;
@@ -24,14 +21,13 @@ internal sealed class TrayApp : ApplicationContext
 
     public TrayApp()
     {
-        _refreshItem.Click += async (_, _) => await RefreshAsync();
-        _startupItem.Click += (_, _) => StartupRegistry.SetEnabled(!StartupRegistry.IsEnabled());
-        _exitItem.Click += (_, _) => ExitThread();
-        _menu.Items.AddRange([_refreshItem, _startupItem, new ToolStripSeparator(), _exitItem]);
-        _menu.Opening += (_, _) => _startupItem.Checked = StartupRegistry.IsEnabled();
-
-        _tray = new NotifyIcon { ContextMenuStrip = _menu, Visible = true };
+        _tray = new NotifyIcon { Visible = true };
         _tray.MouseClick += OnTrayClick;
+        _tray.MouseUp += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Right)
+                ShowMenu();
+        };
 
         _popup.RefreshRequested += async (_, _) => await RefreshAsync();
         _popup.LanguageRequested += (_, lang) =>
@@ -58,6 +54,20 @@ internal sealed class TrayApp : ApplicationContext
             _popup.Hide();
         else if (!_popup.WasJustHidden()) // the click itself closed it via Deactivate
             _popup.ShowNearTray();
+    }
+
+    private void ShowMenu()
+    {
+        _popup.Hide();
+        var s = S;
+        _menu.Show(
+        [
+            new(s.MenuRefresh, () => _ = RefreshAsync(), Enabled: !_refreshing),
+            new(s.MenuStartWithWindows, () => StartupRegistry.SetEnabled(!StartupRegistry.IsEnabled()),
+                Checked: StartupRegistry.IsEnabled()),
+            null,
+            new(s.MenuExit, ExitThread),
+        ], Cursor.Position);
     }
 
     private async Task RefreshAsync()
@@ -96,11 +106,6 @@ internal sealed class TrayApp : ApplicationContext
         try
         {
             var s = S;
-            _refreshItem.Text = s.MenuRefresh;
-            _refreshItem.Enabled = !_refreshing;
-            _startupItem.Text = s.MenuStartWithWindows;
-            _exitItem.Text = s.MenuExit;
-
             var snap = _state.Snapshot;
             bool stale = snap is null || _state.IsStale;
             var newIcon = IconRenderer.Render(snap?.Data.FiveHour?.Utilization, stale);
